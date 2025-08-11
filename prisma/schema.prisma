@@ -1,0 +1,100 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  username  String   @unique
+  email     String   @unique
+  password  String
+  avatar    String?
+  isOnline  Boolean  @default(false)
+  lastSeen  DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  sentMessages     Message[] @relation("MessageSender")
+  roomMemberships  RoomMember[]
+  createdRooms     Room[]    @relation("RoomCreator")
+  messageReads     MessageRead[]
+
+  @@map("users")
+}
+
+model Room {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  isPrivate   Boolean  @default(false)
+  isDirect    Boolean  @default(false)  // New field for direct messaging
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  creator   User         @relation("RoomCreator", fields: [creatorId], references: [id])
+  creatorId String
+  members   RoomMember[]
+  messages  Message[]
+
+  @@map("rooms")
+}
+
+model RoomMember {
+  id       String   @id @default(cuid())
+  joinedAt DateTime @default(now())
+
+  // Relations
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  room   Room   @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  roomId String
+
+  @@unique([userId, roomId])
+  @@map("room_members")
+}
+
+model Message {
+  id        String      @id @default(cuid())
+  content   String
+  type      MessageType @default(TEXT)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  // Relations
+  sender   User   @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  senderId String
+  room     Room   @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  roomId   String
+  reads    MessageRead[]
+
+  @@map("messages")
+}
+
+enum MessageType {
+  TEXT
+  SYSTEM
+  LLM_RESPONSE
+}
+
+model MessageRead {
+  id         String   @id @default(cuid())
+  readAt     DateTime @default(now())
+
+  // Relations
+  message   Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  messageId String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+
+  @@unique([messageId, userId])
+  @@map("message_reads")
+}
